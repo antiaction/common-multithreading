@@ -37,8 +37,8 @@
 
 package com.antiaction.mayhem.core;
 
-import com.antiaction.critical.Mutex;
-import com.antiaction.critical.Multex;
+import com.antiaction.common.concurrent.Mutex;
+import com.antiaction.common.concurrent.Multex;
 
 import java.util.List;
 import java.util.ArrayList;
