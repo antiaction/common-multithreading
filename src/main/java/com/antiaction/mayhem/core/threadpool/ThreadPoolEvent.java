@@ -9,4 +9,7 @@ package com.antiaction.mayhem.core.threadpool;
 
 public class ThreadPoolEvent {
 
+	public ThreadPoolEvent() {
+	}
+
 }

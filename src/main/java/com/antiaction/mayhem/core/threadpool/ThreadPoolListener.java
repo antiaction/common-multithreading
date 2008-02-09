@@ -9,4 +9,6 @@ package com.antiaction.mayhem.core.threadpool;
 
 public interface ThreadPoolListener {
 
+	public void threadDied(ThreadPoolEvent e);
+
 }
