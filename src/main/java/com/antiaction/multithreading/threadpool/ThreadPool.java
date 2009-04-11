@@ -25,7 +25,7 @@
  * 18-Dec-2002 : Idle management debugging.
  * 21-Jun-2003 : Moved to antiaction.com package.
  * 10-Jul-2003 : Added properties to init().
- * 19-Nov-2003 : Moved ThreadPool code to seperat class.
+ * 19-Nov-2003 : Moved ThreadPool code to separate class.
  * 23-Nov-2003 : IWorker interface renamed to IThreadWorker.
  * 23-Nov-2003 : Modified against new interfaces.
  *
@@ -193,7 +193,7 @@ public class ThreadPool implements IThreadPool {
 
 		System.out.println( "ThreadPool initialized." );
 		System.out.println( " min: " + min + " - threshold: " + threshold + " - max: " + max );
-		
+
 		return true;
 	}
 

@@ -11,7 +11,7 @@
  * 16-Feb-2002 : attach()/detach().
  * 15-Dec-2002 : stop().
  * 21-Jun-2003 : Moved to antiaction.com package.
- * 19-Nov-2003 : Moved ThreadPool code/javadoc to seperat interface.
+ * 19-Nov-2003 : Moved ThreadPool code/javadoc to separate interface.
  * 23-Nov-2003 : Altered methods and modified Javadoc.
  *
  */
