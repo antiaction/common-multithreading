@@ -11,7 +11,7 @@
  * 15-Dec-2002 : remove(long).
  * 21-Jun-2003 : Moved to antiaction.com package.
  * 10-Jul-2003 : Added properties to init().
- * 19-Nov-2003 : Moved ThreadPool code/javadoc to seperat interface.
+ * 19-Nov-2003 : Moved ThreadPool code/javadoc to separate interface.
  *
  */
 
@@ -33,7 +33,7 @@ public interface IObjectBroker {
 	 */
 	public boolean init(HashMap props);
 
-	/*
+	/**
 	 * Insert an object in the broker queue, until it is removed.
 	 * @param obj an object to be stored in the broker until it is removed.
 	 */

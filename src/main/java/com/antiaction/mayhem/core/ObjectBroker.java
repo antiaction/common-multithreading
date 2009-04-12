@@ -31,7 +31,7 @@
  * 18-Dec-2002 : Idle management debugging.
  * 21-Jun-2003 : Moved to antiaction.com package.
  * 10-Jul-2003 : Added properties to init().
- * 19-Nov-2003 : Moved ThreadPool code to seperat class.
+ * 19-Nov-2003 : Moved ThreadPool code to separate class.
  *
  */
 
@@ -52,7 +52,7 @@ import java.util.HashMap;
  */
 public class ObjectBroker implements IObjectBroker {
 
-	/** Mutially exclusive objectList Semaphore. */
+	/** Mutually exclusive objectList Semaphore. */
 	private Mutex taskMutex;
 	/** Resource Semaphore, a resource amounts to an object in the objectList. */
 	private Multex tasksSem;
