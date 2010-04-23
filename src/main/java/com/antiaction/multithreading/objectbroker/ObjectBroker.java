@@ -37,12 +37,12 @@
 
 package com.antiaction.multithreading.objectbroker;
 
-import com.antiaction.common.concurrent.Mutex;
-import com.antiaction.common.concurrent.Multex;
-
-import java.util.List;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.antiaction.common.concurrent.Multex;
+import com.antiaction.common.concurrent.Mutex;
 
 /**
  * ObjectBroker.
@@ -53,11 +53,13 @@ import java.util.HashMap;
 public class ObjectBroker implements IObjectBroker {
 
 	/** Mutually exclusive objectList Semaphore. */
-	private Mutex taskMutex;
+	protected Mutex taskMutex;
+
 	/** Resource Semaphore, a resource amounts to an object in the objectList. */
-	private Multex tasksSem;
+	protected Multex tasksSem;
+
 	/** List of objects for the workers. */
-	private List tasks;
+	protected List tasks;
 
 	/**
 	 * Instantiate an empty broker.
@@ -69,7 +71,7 @@ public class ObjectBroker implements IObjectBroker {
 	}
 
 	/* Javadoc Inherited. */
-	public boolean init(HashMap props) {
+	public boolean init(Map props) {
 		return true;
 	}
 

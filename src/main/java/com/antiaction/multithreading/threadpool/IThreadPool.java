@@ -18,7 +18,7 @@
 
 package com.antiaction.multithreading.threadpool;
 
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * ThreadPool Interface.
@@ -32,7 +32,7 @@ public interface IThreadPool {
 	 * Initialize object with specified properties.
 	 * @param props init properties.
 	 */
-	public boolean init(HashMap props);
+	public boolean init(Map props);
 
 	/**
 	 * Sets the <CODE>Thread</CODE> mold for this ThreadPool, which is used either

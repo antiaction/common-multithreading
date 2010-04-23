@@ -17,7 +17,7 @@
 
 package com.antiaction.multithreading.objectbroker;
 
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * ObjectBroker Interface.
@@ -31,7 +31,7 @@ public interface IObjectBroker {
 	 * Initialize object with specified properties.
 	 * @param props init properties.
 	 */
-	public boolean init(HashMap props);
+	public boolean init(Map props);
 
 	/**
 	 * Insert an object in the broker queue, until it is removed.

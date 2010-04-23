@@ -33,7 +33,7 @@
 
 package com.antiaction.multithreading.threadpool;
 
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Advanced ThreadPool manager.
@@ -44,51 +44,51 @@ import java.util.HashMap;
 public class ThreadPool implements IThreadPool {
 
 	/** Shutdown boolean. */
-	private boolean exit = false;
+	protected boolean exit = false;
 
 	/** Has thread been started. */
-	private boolean running = false;
+	protected boolean running = false;
 
 	/** ThreadGroup. */
-	private ThreadGroup threadGroup;
+	protected ThreadGroup threadGroup;
 
 	/** Original thread, used for cloning. */
-	private IThreadWorker threadWorker;
+	protected IThreadWorker threadWorker;
 
 	/** Minimum workers. */
-	private int min = 1;
+	protected int min = 1;
 	/** Threshold - minimum free workers before more are spawned but below max. */
-	private int threshold = 1;
+	protected int threshold = 1;
 	/** Maximum workers. */
-	private int max = 1;
+	protected int max = 1;
 
 	/** Initial sample second interval. */
-	private int idleSampleSecsInit = 60 * 1;
+	protected int idleSampleSecsInit = 60 * 1;
 	/** Sample second interval. */
-	private int idleSampleSecs = 60;
+	protected int idleSampleSecs = 60;
 	/** Lastmodified idlecount timeout. */
-	private int lastModifiedTimeout = 1000 * 60 * 30;
+	protected int lastModifiedTimeout = 1000 * 60 * 30;
 
 	/** Min idle number compared/set each time a worker goes busy. */
-	private int minIdle = 0;
+	protected int minIdle = 0;
 	/** Worker stop count. */
-	private int stop = 0;
+	protected int stop = 0;
 
 	/** Workers started-stopped. */
-	private int workers = 0;
+	protected int workers = 0;
 	/** Worker Threads. */
-	private int workerThreads = 0;
+	protected int workerThreads = 0;
 	/** Working Threads. */
-	private int workingThreads = 0;
+	protected int workingThreads = 0;
 	/** Idle Threads. */
-	private int idleThreads = 0;
+	protected int idleThreads = 0;
 
 	//private List workerList;
 
 	/** Array of idle objects in a linked list sorted by index=idlecountindex. */
-	private IdleObject[] idleObjects;
+	protected IdleObject[] idleObjects;
 	/** First idle object in linked list. */
-	private IdleObject rootIdleObj = null;
+	protected IdleObject rootIdleObj = null;
 
 	public ThreadPool() {
 		threadGroup = new ThreadGroup( "ThreadPool" );
@@ -97,7 +97,7 @@ public class ThreadPool implements IThreadPool {
 	}
 
 	/* Javadoc Inherited. */
-	public boolean init(HashMap props) {
+	public boolean init(Map props) {
 		String strMin = (String)props.get( "min" );
 		String strThreshold = (String)props.get( "threshold" );
 		String strMax = (String)props.get( "max" );
@@ -198,7 +198,7 @@ public class ThreadPool implements IThreadPool {
 	}
 
 	/** ThreadPool object. */
-	private IThreadPool threadPool;
+	protected IThreadPool threadPool;
 
 	class InnerThread implements Runnable {
 
