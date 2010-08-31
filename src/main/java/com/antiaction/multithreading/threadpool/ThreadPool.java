@@ -1,6 +1,6 @@
 /*
  * Advanced ThreadPool manager.
- * Copyright (C) 2001, 2002, 2003  Nicholas Clarke
+ * Copyright (C) 2001, 2002, 2003, 2010  Nicholas Clarke
  *
  */
 
@@ -28,6 +28,8 @@
  * 19-Nov-2003 : Moved ThreadPool code to separate class.
  * 23-Nov-2003 : IWorker interface renamed to IThreadWorker.
  * 23-Nov-2003 : Modified against new interfaces.
+ * 30-Aug-2010 : Separated monitoring thread from pool.
+ * 31-Aug-2010 : Renamed several variables and refactored some methods.
  *
  */
 
@@ -36,12 +38,12 @@ package com.antiaction.multithreading.threadpool;
 import java.util.Map;
 
 /**
- * Advanced ThreadPool manager.
+ * Advanced ThreadPool.
  *
  * @version 1.00
  * @author Nicholas Clarke <mayhem[at]antiaction[dot]com>
  */
-public class ThreadPool implements IThreadPool {
+public class ThreadPool implements IThreadPool, IResourcePool {
 
 	/** Shutdown boolean. */
 	protected boolean exit = false;
@@ -49,46 +51,33 @@ public class ThreadPool implements IThreadPool {
 	/** Has thread been started. */
 	protected boolean running = false;
 
+	/** ThreadPool object. */
+	protected IThreadPool threadPool;
+
 	/** ThreadGroup. */
 	protected ThreadGroup threadGroup;
 
 	/** Original thread, used for cloning. */
 	protected IThreadWorker threadWorker;
 
-	/** Minimum workers. */
-	protected int min = 1;
-	/** Threshold - minimum free workers before more are spawned but below max. */
-	protected int threshold = 1;
-	/** Maximum workers. */
-	protected int max = 1;
+	/** Resource manager monitoring thread. */
+	protected ResourceManager resourceManager;
 
-	/** Initial sample second interval. */
-	protected int idleSampleSecsInit = 60 * 1;
-	/** Sample second interval. */
-	protected int idleSampleSecs = 60;
-	/** Lastmodified idlecount timeout. */
-	protected int lastModifiedTimeout = 1000 * 60 * 30;
+	/** Total amount of thread allocated. */
+	protected int allocated_threads = 0;
 
-	/** Min idle number compared/set each time a worker goes busy. */
-	protected int minIdle = 0;
-	/** Worker stop count. */
-	protected int stop = 0;
+	/** Idle thread. */
+	protected int idle_threads = 0;
 
-	/** Workers started-stopped. */
-	protected int workers = 0;
+	/** Thread to stop. */
+	protected int overflowing_threads = 0;
+
 	/** Worker Threads. */
-	protected int workerThreads = 0;
+	protected int registered_threads = 0;
 	/** Working Threads. */
-	protected int workingThreads = 0;
-	/** Idle Threads. */
-	protected int idleThreads = 0;
+	protected int busy_threads = 0;
 
 	//private List workerList;
-
-	/** Array of idle objects in a linked list sorted by index=idlecountindex. */
-	protected IdleObject[] idleObjects;
-	/** First idle object in linked list. */
-	protected IdleObject rootIdleObj = null;
 
 	public ThreadPool() {
 		threadGroup = new ThreadGroup( "ThreadPool" );
@@ -102,34 +91,34 @@ public class ThreadPool implements IThreadPool {
 		String strThreshold = (String)props.get( "threshold" );
 		String strMax = (String)props.get( "max" );
 
+		resourceManager = new ResourceManager();
+		resourceManager.resourcePool = this;
+
 		if ( ( strMin != null ) && ( strMin.length() > 0 ) ) {
 			try {
-				min = Integer.parseInt( strMin );
+				resourceManager.min = Integer.parseInt( strMin );
 			}
 			catch (NumberFormatException e) {
-				min = 2;
+				resourceManager.min = 1;
 			}
-			//return false;
 		}
 
 		if ( ( strThreshold != null ) && ( strThreshold.length() > 0 ) ) {
 			try {
-				threshold = Integer.parseInt( strThreshold );
+				resourceManager.threshold = Integer.parseInt( strThreshold );
 			}
 			catch (NumberFormatException e) {
-				threshold = 2;
+				resourceManager.threshold = 1;
 			}
-			//return false;
 		}
 
 		if ( ( strMax != null ) && ( strMax.length() > 0 ) ) {
 			try {
-				max = Integer.parseInt( strMax );
+				resourceManager.max = Integer.parseInt( strMax );
 			}
 			catch (NumberFormatException e) {
-				max = 2;
+				resourceManager.max = 1;
 			}
-			//return false;
 		}
 
 		return true;
@@ -143,38 +132,37 @@ public class ThreadPool implements IThreadPool {
 
 	/* Javadoc Inherited. */
 	public synchronized void register() {
-		++workerThreads;
-		++workingThreads;
+		++registered_threads;
+		++busy_threads;
 	}
 
 	/* Javadoc Inherited. */
 	public synchronized void unregister() {
-		--workerThreads;
-		--workingThreads;
+		--registered_threads;
+		--busy_threads;
 	}
 
 	/* Javadoc Inherited. */
 	public synchronized void checkIn() {
-		--workingThreads;
-		++idleThreads;
+		--busy_threads;
+		++idle_threads;
+		resourceManager.update( allocated_threads, idle_threads );
 	}
 
 	/* Javadoc Inherited. */
 	public synchronized void checkOut() {
-		++workingThreads;
-		--idleThreads;
-		if ( idleThreads < minIdle ) {
-			minIdle = idleThreads;
-		}
+		++busy_threads;
+		--idle_threads;
+		resourceManager.update( allocated_threads, idle_threads );
 	}
 
 	/* Javadoc Inherited. */
 	public synchronized boolean stop() {
-		if ( stop == 0 ) {
+		if ( overflowing_threads == 0 ) {
 			return false;
 		}
 		else {
-			--stop;
+			--overflowing_threads;
 			return true;
 		}
 	}
@@ -186,247 +174,41 @@ public class ThreadPool implements IThreadPool {
 			throw new IllegalStateException( "ThreadPool already initialized!" );
 		}
 
-		t = new Thread( threadGroup, new InnerThread() );
+		t = new Thread( threadGroup, resourceManager );
 		t.start();
 
 		running = true;
 
 		System.out.println( "ThreadPool initialized." );
-		System.out.println( " min: " + min + " - threshold: " + threshold + " - max: " + max );
+		System.out.println( " min: " + resourceManager.min + " - threshold: " + resourceManager.threshold + " - max: " + resourceManager.max );
 
 		return true;
 	}
 
-	/** ThreadPool object. */
-	protected IThreadPool threadPool;
+	public void allocate(int n) {
+		IThreadWorker w;
+		Thread t;
+		for( int i=0; i<n; ++i ) {
+			w = (IThreadWorker)threadWorker.clone();
+			w.setThreadPool( threadPool );
+			t = new Thread( threadGroup, w );
+			//t.setPriority( 1 );
+			t.start();
 
-	class InnerThread implements Runnable {
+			++allocated_threads;
+			resourceManager.update( allocated_threads, idle_threads );
 
-		public InnerThread() {
+			//workerList.add( new WorkerEntry( w, t ) );
+
+			// debug
+			//System.out.println( "Worker spawned." );
 		}
-
-		public void run() {
-			IThreadWorker w;
-			Thread t;
-			int n;
-
-			long ctm = 0;
-
-			int sampleSeconds = idleSampleSecsInit;
-			int localMinIdle = 0;
-
-			/*
-			 * Idle monitoring objects.
-			 */
-
-			idleObjects = new IdleObject[ max + 1 ];
-			IdleObject prevIdleObj = null;
-			IdleObject idleObj = null;
-			IdleObject nextIdleObj = null;
-
-			for ( int i=0; i<=max; ++i ) {
-				idleObj = new IdleObject( i );
-				idleObjects[ i ] = idleObj;
-				if ( i > 0 ) {
-					prevIdleObj.next = idleObj;
-					idleObj.prev = prevIdleObj;
-				}
-				prevIdleObj = idleObj;
-			}
-
-			rootIdleObj = idleObjects[ 0 ];
-
-			/*
-			 * Monitor loop.
-			 */
-
-			while ( !exit ) {
-				// debug
-				//System.out.println( workerThreads + " - " + workingThreads + " - " + idleThreads );
-				//System.out.println( workerList.size() );
-
-				if ( ( workers < max ) && ( idleThreads < threshold ) ) {
-					/*
-					 * Add.
-					 */
-					n = threshold - idleThreads;
-					if ( ( workers + n > max ) ) {
-						n = max - workers;
-					}
-					for( int i=0; i<n; ++i ) {
-						w = (IThreadWorker)threadWorker.clone();
-						w.setThreadPool( threadPool );
-						t = new Thread( threadGroup, w );
-						//t.setPriority( 1 );
-						t.start();
-
-						++workers;
-						//workerList.add( new WorkerEntry( w, t ) );
-
-						// debug
-						//System.out.println( "Worker spawned." );
-					}
-				}
-				else {
-					/*
-					 * New min idle.
-					 */
-					if ( sampleSeconds < 0 ) {
-						sampleSeconds = idleSampleSecs;
-						synchronized( this ) {
-							localMinIdle = minIdle;
-							minIdle = idleThreads;
-						}
-						// debug
-						//System.out.println( workers + " - " + localMinIdle);
-
-						/*
-						 * Last modified.
-						 */
-
-						ctm = System.currentTimeMillis();
-						idleObjects[ localMinIdle ].lastModified = ctm;
-
-						/*
-						 * Remove old idleObjects.
-						 */
-						idleObj = rootIdleObj;
-
-						while ( idleObj != null ) {
-							if ( ( ctm - idleObj.lastModified ) > ( lastModifiedTimeout ) ) {
-								prevIdleObj = idleObj.prev;
-								nextIdleObj = idleObj.next;
-								if ( nextIdleObj != null ) {
-									nextIdleObj.prev = prevIdleObj;
-								}
-								if ( prevIdleObj != null ) {
-									prevIdleObj.next = nextIdleObj;
-								}
-								else {
-									rootIdleObj = nextIdleObj;
-								}
-								idleObj.prev = null;
-								idleObj.next = null;
-								idleObj = nextIdleObj;
-							}
-							else {
-								idleObj = idleObj.next;
-							}
-						}
-						/*
-						 * Insert new IdleObject.
-						 */
-						idleObj = idleObjects[ localMinIdle ];
-						if ( rootIdleObj == null ) {
-							rootIdleObj = idleObj;
-						}
-						else if ( ( idleObj.prev == null ) && ( idleObj.next == null ) && ( idleObj != rootIdleObj ) ) {
-							prevIdleObj = null;
-							nextIdleObj = rootIdleObj;
-
-							boolean b = true;
-							/*
-							 * Compare.
-							 */
-							while ( b ) {
-								if ( idleObj.index < nextIdleObj.index ) {
-									b = false;
-								}
-								else {
-									prevIdleObj = nextIdleObj;
-									nextIdleObj = nextIdleObj.next;
-									if ( nextIdleObj == null ) {
-										b = false;
-									}
-								}
-							}
-							/*
-							 * Insert.
-							 */
-							if ( prevIdleObj == null ) {
-								rootIdleObj = idleObj;
-							}
-							else {
-								prevIdleObj.next = idleObj;
-								idleObj.prev = prevIdleObj;
-							}
-							if ( nextIdleObj != null ) {
-								idleObj.next = nextIdleObj;
-								nextIdleObj.prev = idleObj;
-							}
-						}
-						/*
-						 * Print.
-						 */
-						/*
-						 idleObj = rootIdleObj;
-						 while ( idleObj != null ) {
-							 System.out.println( idleObj.index);
-							 idleObj = idleObj.next;
-						}
-						*/
-						/*
-						 * Stop.
-						 */
-						int postWorkers;
-						if ( ( rootIdleObj != null ) && ( rootIdleObj.index > threshold ) && ( workers > min ) ) {
-							postWorkers = workers - ( rootIdleObj.index - threshold );
-							if ( postWorkers < min ) {
-								postWorkers = min;
-							}
-							stop += ( workers - postWorkers );
-							workers -= ( workers - postWorkers );
-
-							// debug
-							//System.out.println( "Stopping: " + stop );
-						}
-					}
-				}
-
-				try {
-					Thread.sleep( 1000 );
-					--sampleSeconds;
-				}
-				catch (InterruptedException e) {
-				}
-			}
-		}
-
-/*
-		public void validate() {
-			IdleObject prevIdleObj = null;
-			IdleObject idleObj = rootIdleObj;
-
-			while ( idleObj != null ) {
-				// debug
-				System.out.println( idleObj );
-				if ( idleObj.prev == idleObj ) {
-					System.out.println( "error: prev" );
-					System.exit( 1 );
-				}
-				if ( idleObj.next == idleObj ) {
-					System.out.println( "error: next" );
-					System.exit( 1 );
-				}
-				prevIdleObj = idleObj;
-				idleObj = idleObj.next;
-			}
-		}
-*/
 	}
 
-	class IdleObject {
-
-		int index;
-		long lastModified;
-
-		IdleObject prev = null;
-		IdleObject next = null;
-
-		IdleObject(int _index) {
-			index = _index;
-		}
-
+	public void release(int n) {
+		overflowing_threads += n;
+		allocated_threads -= n;
+		resourceManager.update( allocated_threads, idle_threads );
 	}
 
 	/*
