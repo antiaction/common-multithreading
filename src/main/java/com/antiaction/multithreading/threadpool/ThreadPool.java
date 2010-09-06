@@ -30,12 +30,20 @@
  * 23-Nov-2003 : Modified against new interfaces.
  * 30-Aug-2010 : Separated monitoring thread from pool.
  * 31-Aug-2010 : Renamed several variables and refactored some methods.
+ * 06-Sep-2010 : Added check pool for dead threads and various other enhancements.
  *
  */
 
 package com.antiaction.multithreading.threadpool;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import com.antiaction.multithreading.resourcemanage.IResourcePool;
+import com.antiaction.multithreading.resourcemanage.ResourceManager;
 
 /**
  * Advanced ThreadPool.
@@ -51,6 +59,12 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	/** Has thread been started. */
 	protected boolean running = false;
 
+	/** Resource manager monitoring instance. */
+	protected ResourceManager resourceManager;
+
+	/** Resource manager monitoring thread. */
+	protected Thread resourceManagerThread;
+
 	/** ThreadPool object. */
 	protected IThreadPool threadPool;
 
@@ -59,9 +73,6 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 
 	/** Original thread, used for cloning. */
 	protected IThreadWorker threadWorker;
-
-	/** Resource manager monitoring thread. */
-	protected ResourceManager resourceManager;
 
 	/** Total amount of thread allocated. */
 	protected int allocated_threads = 0;
@@ -74,15 +85,24 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 
 	/** Worker Threads. */
 	protected int registered_threads = 0;
+
 	/** Working Threads. */
 	protected int busy_threads = 0;
 
-	//private List workerList;
+	protected List threadList;
+
+	protected List idleList;
+
+	protected Set busySet;
 
 	public ThreadPool() {
+		resourceManager = new ResourceManager( this );
+
 		threadGroup = new ThreadGroup( "ThreadPool" );
 		threadPool = this;
-		//workerList = new ArrayList();
+		threadList = new ArrayList();
+		idleList = new ArrayList();
+		busySet = new HashSet();
 	}
 
 	/* Javadoc Inherited. */
@@ -91,37 +111,56 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 		String strThreshold = (String)props.get( "threshold" );
 		String strMax = (String)props.get( "max" );
 
-		resourceManager = new ResourceManager();
-		resourceManager.resourcePool = this;
+		int min = 1;
+		int threshold = 1;
+		int max = 1;
 
 		if ( ( strMin != null ) && ( strMin.length() > 0 ) ) {
 			try {
-				resourceManager.min = Integer.parseInt( strMin );
+				min = Integer.parseInt( strMin );
 			}
 			catch (NumberFormatException e) {
-				resourceManager.min = 1;
+				min = 1;
 			}
 		}
 
 		if ( ( strThreshold != null ) && ( strThreshold.length() > 0 ) ) {
 			try {
-				resourceManager.threshold = Integer.parseInt( strThreshold );
+				threshold = Integer.parseInt( strThreshold );
 			}
 			catch (NumberFormatException e) {
-				resourceManager.threshold = 1;
+				threshold = 1;
 			}
 		}
 
 		if ( ( strMax != null ) && ( strMax.length() > 0 ) ) {
 			try {
-				resourceManager.max = Integer.parseInt( strMax );
+				max = Integer.parseInt( strMax );
 			}
 			catch (NumberFormatException e) {
-				resourceManager.max = 1;
+				max = 1;
 			}
 		}
 
+		resourceManager.setMin( min );
+		resourceManager.setThreshold( threshold );
+		resourceManager.setMax( max );
+
 		return true;
+	}
+
+	public boolean start() {
+		if ( !running ) {
+			resourceManagerThread = new Thread( threadGroup, resourceManager );
+			resourceManagerThread.start();
+
+			running = true;
+
+			System.out.println( "ThreadPool initialized." );
+			System.out.println( " min: " + resourceManager.getMin() + " - threshold: " + resourceManager.getThreshold() + " - max: " + resourceManager.getMax() );
+		}
+
+		return running;
 	}
 
 	/* Javadoc Inherited. */
@@ -131,58 +170,50 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	}
 
 	/* Javadoc Inherited. */
-	public synchronized void register() {
-		++registered_threads;
-		++busy_threads;
-	}
-
-	/* Javadoc Inherited. */
-	public synchronized void unregister() {
-		--registered_threads;
-		--busy_threads;
-	}
-
-	/* Javadoc Inherited. */
-	public synchronized void checkIn() {
-		--busy_threads;
-		++idle_threads;
-		resourceManager.update( allocated_threads, idle_threads );
-	}
-
-	/* Javadoc Inherited. */
-	public synchronized void checkOut() {
-		++busy_threads;
-		--idle_threads;
-		resourceManager.update( allocated_threads, idle_threads );
-	}
-
-	/* Javadoc Inherited. */
-	public synchronized boolean stop() {
-		if ( overflowing_threads == 0 ) {
-			return false;
-		}
-		else {
-			--overflowing_threads;
-			return true;
+	public void register() {
+		synchronized ( this ) {
+			++registered_threads;
+			++busy_threads;
 		}
 	}
 
-	public boolean start() {
-		Thread t;
-
-		if ( running ) {
-			throw new IllegalStateException( "ThreadPool already initialized!" );
+	/* Javadoc Inherited. */
+	public void unregister() {
+		synchronized ( this ) {
+			--registered_threads;
+			--busy_threads;
 		}
+	}
 
-		t = new Thread( threadGroup, resourceManager );
-		t.start();
+	/* Javadoc Inherited. */
+	public void checkIn() {
+		synchronized ( this ) {
+			--busy_threads;
+			++idle_threads;
+			resourceManager.update( allocated_threads, idle_threads );
+		}
+	}
 
-		running = true;
+	/* Javadoc Inherited. */
+	public void checkOut() {
+		synchronized ( this ) {
+			++busy_threads;
+			--idle_threads;
+			resourceManager.update( allocated_threads, idle_threads );
+		}
+	}
 
-		System.out.println( "ThreadPool initialized." );
-		System.out.println( " min: " + resourceManager.min + " - threshold: " + resourceManager.threshold + " - max: " + resourceManager.max );
-
-		return true;
+	/* Javadoc Inherited. */
+	public boolean stop() {
+		synchronized ( this ) {
+			if ( overflowing_threads <= 0 ) {
+				return false;
+			}
+			else {
+				--overflowing_threads;
+				return true;
+			}
+		}
 	}
 
 	public void allocate(int n) {
@@ -195,8 +226,10 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 			//t.setPriority( 1 );
 			t.start();
 
-			++allocated_threads;
-			resourceManager.update( allocated_threads, idle_threads );
+			synchronized ( this ) {
+				++allocated_threads;
+				resourceManager.update( allocated_threads, idle_threads );
+			}
 
 			//workerList.add( new WorkerEntry( w, t ) );
 
@@ -206,9 +239,44 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	}
 
 	public void release(int n) {
-		overflowing_threads += n;
-		allocated_threads -= n;
-		resourceManager.update( allocated_threads, idle_threads );
+		synchronized ( this ) {
+			overflowing_threads += n;
+			allocated_threads -= n;
+			resourceManager.update( allocated_threads, idle_threads );
+		}
+	}
+
+	public void check_pool() {
+		List checkList;
+		Thread t;
+		synchronized ( this ) {
+			checkList = new ArrayList( threadList );
+		}
+		int i = 0;
+		while ( i<checkList.size() ) {
+			t = (Thread)checkList.get( i );
+			if ( !t.isAlive() ) {
+				synchronized ( this ) {
+					if ( busySet.contains( t ) ) {
+						--allocated_threads;
+						--registered_threads;
+						--busy_threads;
+						busySet.remove( t );
+					}
+					else if ( idleList.contains( t ) ) {
+						--allocated_threads;
+						--registered_threads;
+						--idle_threads;
+						idleList.remove( t );
+					}
+					threadList.remove( t );
+				}
+
+				// debug
+				System.out.println( "Dead thread: " + t );
+			}
+			++i;
+		}
 	}
 
 	/*

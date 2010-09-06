@@ -33,7 +33,7 @@
  *
  */
 
-package com.antiaction.multithreading.threadpool;
+package com.antiaction.multithreading.resourcemanage;
 
 /**
  * Advanced resource manager.
@@ -81,7 +81,32 @@ public class ResourceManager implements Runnable {
 	/** Idle resources. */
 	protected int idle = 0;
 
-	public ResourceManager() {
+	public ResourceManager(IResourcePool resourcePool) {
+		this.resourcePool = resourcePool;
+	}
+
+	public int getMin() {
+		return min;
+	}
+
+	public void setMin(int min) {
+		this.min = min;
+	}
+
+	public int getThreshold() {
+		return threshold;
+	}
+
+	public void setThreshold(int threshold) {
+		this.threshold = threshold;
+	}
+
+	public int getMax() {
+		return max;
+	}
+
+	public void setMax(int max) {
+		this.max = max;
 	}
 
 	public void update(int allocated, int idle) {
@@ -133,6 +158,8 @@ public class ResourceManager implements Runnable {
 			// debug
 			//System.out.println( workerThreads + " - " + workingThreads + " - " + idleThreads );
 			//System.out.println( workerList.size() );
+
+			resourcePool.check_pool();
 
 			if ( ( allocated < max ) && ( idle < threshold ) ) {
 				/*
