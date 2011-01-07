@@ -277,6 +277,7 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 			}
 			++i;
 		}
+		resourceManager.update( allocated_threads, idle_threads );
 	}
 
 	/*

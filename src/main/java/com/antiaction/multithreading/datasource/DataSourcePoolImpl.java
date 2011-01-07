@@ -283,6 +283,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			}
 			++i;
 		}
+		resourceManager.update( allocated, idle );
 	}
 
 	protected Connection openConnection() {
