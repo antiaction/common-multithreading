@@ -31,6 +31,7 @@
  * 30-Aug-2010 : Separated monitoring thread from pool.
  * 31-Aug-2010 : Renamed several variables and refactored some methods.
  * 06-Sep-2010 : Added check pool for dead threads and various other enhancements.
+ * 27-Jun-2011 : Refactored init and commented the variables.
  *
  */
 
@@ -53,6 +54,10 @@ import com.antiaction.multithreading.resourcemanage.ResourceManager;
  */
 public class ThreadPool implements IThreadPool, IResourcePool {
 
+	/*
+	 * Thread.
+	 */
+
 	/** Shutdown boolean. */
 	protected boolean exit = false;
 
@@ -65,14 +70,31 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	/** Resource manager monitoring thread. */
 	protected Thread resourceManagerThread;
 
+	/*
+	 * Threadpool configuration.
+	 */
+
+	/** Original thread, used for cloning. */
+	protected IThreadWorker threadWorker;
+
+	/** Minimum resources allocated. */
+	protected int min = 1;
+
+	/** Minimum idle resources allocated. */
+	protected int minIdle = 1;
+
+	/** Maximum resources allocated. */
+	protected int max = 1;
+
+	/*
+	 * Internal state.
+	 */
+
 	/** ThreadPool object. */
 	protected IThreadPool threadPool;
 
 	/** ThreadGroup. */
 	protected ThreadGroup threadGroup;
-
-	/** Original thread, used for cloning. */
-	protected IThreadWorker threadWorker;
 
 	/** Total amount of thread allocated. */
 	protected int allocated_threads = 0;
@@ -80,7 +102,7 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	/** Idle thread. */
 	protected int idle_threads = 0;
 
-	/** Thread to stop. */
+	/** Threads to stop. */
 	protected int overflowing_threads = 0;
 
 	/** Worker Threads. */
@@ -97,7 +119,6 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 
 	public ThreadPool() {
 		resourceManager = new ResourceManager( this );
-
 		threadGroup = new ThreadGroup( "ThreadPool" );
 		threadPool = this;
 		threadList = new ArrayList();
@@ -107,50 +128,31 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 
 	/* Javadoc Inherited. */
 	public boolean init(Map props) {
-		String strMin = (String)props.get( "min" );
-		String strThreshold = (String)props.get( "threshold" );
-		String strMax = (String)props.get( "max" );
-
-		int min = 1;
-		int threshold = 1;
-		int max = 1;
-
-		if ( ( strMin != null ) && ( strMin.length() > 0 ) ) {
-			try {
-				min = Integer.parseInt( strMin );
-			}
-			catch (NumberFormatException e) {
-				min = 1;
-			}
-		}
-
-		if ( ( strThreshold != null ) && ( strThreshold.length() > 0 ) ) {
-			try {
-				threshold = Integer.parseInt( strThreshold );
-			}
-			catch (NumberFormatException e) {
-				threshold = 1;
-			}
-		}
-
-		if ( ( strMax != null ) && ( strMax.length() > 0 ) ) {
-			try {
-				max = Integer.parseInt( strMax );
-			}
-			catch (NumberFormatException e) {
-				max = 1;
-			}
-		}
-
-		resourceManager.setMin( min );
-		resourceManager.setThreshold( threshold );
-		resourceManager.setMax( max );
+		min = getMapInt( props, "min", 1 );
+		minIdle = getMapInt( props, "min-idle", getMapInt( props, "threshold", 1 ) );
+		max = getMapInt( props, "max", 1 );
 
 		return true;
 	}
 
+	private static int getMapInt(Map map, String name, int defaultValue) {
+		int value = defaultValue;
+		if ( map != null && name != null && name.length() > 0 && map.containsKey( name ) ) {
+			try {
+				value = Integer.parseInt( (String)map.get( name ) );
+			}
+			catch (NumberFormatException e) {
+			}
+		}
+		return value;
+	}
+
 	public boolean start() {
 		if ( !running ) {
+			resourceManager.setMin( min );
+			resourceManager.setThreshold( minIdle );
+			resourceManager.setMax( max );
+
 			resourceManagerThread = new Thread( threadGroup, resourceManager );
 			resourceManagerThread.start();
 

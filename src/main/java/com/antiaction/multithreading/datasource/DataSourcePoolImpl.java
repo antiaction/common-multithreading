@@ -1,6 +1,6 @@
 /*
  * JDBC DataSource implementation.
- * Copyright (C) 2004, 2007, 2010  Nicholas Clarke
+ * Copyright (C) 2004, 2007, 2010, 2011  Nicholas Clarke
  *
  */
 
@@ -12,6 +12,8 @@
  * 29-Aug-2010 : Started on an implementation using a connection pool.
  * 05-Sep-2010 : Implemented the release method.
  * 06-Sep-2010 : Added check pool for closed connections and various other enhancements.
+ * 20-Jun-2011 : Added a query to check if the connection is alive.
+ * 27-Jun-2011 : Refactored init and commented the variables.
  *
  */
 
@@ -20,7 +22,9 @@ package com.antiaction.multithreading.datasource;
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +53,10 @@ import com.antiaction.multithreading.resourcemanage.ResourceManager;
  */
 public class DataSourcePoolImpl implements DataSource, IResourcePool {
 
+	/*
+	 * Thread.
+	 */
+
 	/** Shutdown boolean. */
 	protected boolean exit = false;
 
@@ -60,6 +68,10 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 
 	/** Resource manager monitoring thread. */
 	protected Thread resourceManagerThread;
+
+	/*
+	 * DataSource configuration.
+	 */
 
 	/** Connection timeout. */
 	protected int timeout = 0;
@@ -81,6 +93,22 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 	/** Connection password. */
 	protected String ds_password;
 
+	/** Minimum resources allocated. */
+	protected int min;
+
+	/** Minimum idle resources allocated. */
+	protected int minIdle;
+
+	/** Maximum resources allocated. */
+	protected int max;
+
+	/** Connection alive Sql. */
+	protected String validation_query;
+
+	/*
+	 * Internal state.
+	 */
+
 	protected int allocated = 0;
 
 	protected int idle = 0;
@@ -91,9 +119,6 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 
 	protected DataSourcePoolImpl() {
 		resourceManager = new ResourceManager( this );
-		resourceManager.setMin( 4 );
-		resourceManager.setThreshold( 4 );
-		resourceManager.setMax( 16 );
 		idleList = new ArrayList( 16 );
 		busySet = new HashSet( 16 );
 	}
@@ -136,6 +161,10 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 					dataSource.ds_username = userName;
 					dataSource.ds_password = password;
 
+					dataSource.min = getMapInt( config, "min", 4 );
+					dataSource.minIdle = getMapInt( config, "min-idle", 4 );
+					dataSource.max = getMapInt( config, "max", 16 );
+
 					dataSource.start();
 				}
 				else {
@@ -150,8 +179,24 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		return dataSource;
 	}
 
+	private static int getMapInt(Map map, String name, int defaultValue) {
+		int value = defaultValue;
+		if ( map != null && name != null && name.length() > 0 && map.containsKey( name ) ) {
+			try {
+				value = Integer.parseInt( (String)map.get( name ) );
+			}
+			catch (NumberFormatException e) {
+			}
+		}
+		return value;
+	}
+
 	public boolean start() {
 		if ( !running ) {
+			resourceManager.setMin( min );
+			resourceManager.setThreshold( minIdle );
+			resourceManager.setMax( max );
+
 			resourceManagerThread = new Thread( resourceManager );
 			resourceManagerThread.start();
 
@@ -199,11 +244,16 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		Connection conn = null;
 		synchronized ( this ) {
 			if ( idle > 0 ) {
-				--idle;
 				conn = (Connection)idleList.remove( idleList.size() - 1 );
 				conn = ConnectionPooled.getInstance( this, conn );
-				busySet.add( conn );
-				resourceManager.update( allocated, idle );
+				if ( check_connection_open( conn ) ) {
+					--idle;
+					busySet.add( conn );
+					resourceManager.update( allocated, idle );
+				}
+				else {
+					conn = null;
+				}
 			}
 		}
 		if ( conn == null ) {
@@ -222,11 +272,16 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		Connection conn;
 		for ( int i=0; i<n; ++i ) {
 			conn = openConnection();
-			synchronized ( this ) {
-				++allocated;
-				++idle;
-				idleList.add( conn );
-				resourceManager.update( allocated, idle );
+			if ( conn != null ) {
+				synchronized ( this ) {
+					++allocated;
+					++idle;
+					idleList.add( conn );
+					resourceManager.update( allocated, idle );
+				}
+			}
+			else {
+				return;
 			}
 		}
 	}
@@ -243,13 +298,13 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 				else {
 					n = 0;
 				}
-
 			}
 			if ( conn != null ) {
 				try {
 					conn.close();
 				}
 				catch (SQLException e) {
+					// Suppress sql exception.
 				}
 				conn = null;
 			}
@@ -265,25 +320,38 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		int i = 0;
 		while ( i < checkList.size() ) {
 			conn = (Connection)checkList.get( i );
-			try {
-				if ( conn.isClosed() ) {
-					synchronized ( this ) {
-						if ( idleList.contains( conn ) ) {
-							--idle;
-							--allocated;
-							idleList.remove( conn );
-						}
-					}
-
-					// debug
-					System.out.println( "Closed connection: " + conn );
-				}
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
+			check_connection_open( conn );
 			++i;
 		}
 		resourceManager.update( allocated, idle );
+	}
+
+	protected boolean check_connection_open(Connection conn) {
+		boolean bClosed = true;
+		try {
+			bClosed = conn.isClosed();
+			if ( !bClosed ) {
+				Statement stm = conn.createStatement();
+				ResultSet rs = stm.executeQuery( "SELECT 1" );
+				rs.close();
+			}
+		} catch (SQLException e) {
+			// Suppress no route to host.
+			bClosed = true;
+		}
+		if ( bClosed ) {
+			synchronized ( this ) {
+				if ( idleList.contains( conn ) ) {
+					--idle;
+					--allocated;
+					idleList.remove( conn );
+				}
+			}
+
+			// debug
+			System.out.println( "Closed connection: " + conn );
+		}
+		return !bClosed;
 	}
 
 	protected Connection openConnection() {
@@ -304,9 +372,8 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			System.out.println( "Database connect time: " + dt + " ms." );
 		}
 		catch (SQLException e) {
-			e.printStackTrace();
+			// Suppress no route to host.
 		}
-
 		return conn;
 	}
 
@@ -314,18 +381,19 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		synchronized ( this ) {
 			busySet.remove( conn );
 			Connection orgConn = conn.getOriginalConnection();
+			boolean bIsClosed = true;
 			try {
-				if ( !orgConn.isClosed() ) {
-					++idle;
-					idleList.add( orgConn );
-				}
-				else {
-					--allocated;
-				}
+				bIsClosed = orgConn.isClosed();
 			}
 			catch (SQLException e) {
+				// Suppress sql exception.
+			}
+			if ( !bIsClosed ) {
+				++idle;
+				idleList.add( orgConn );
+			}
+			else {
 				--allocated;
-				e.printStackTrace();
 			}
 		}
 	}
