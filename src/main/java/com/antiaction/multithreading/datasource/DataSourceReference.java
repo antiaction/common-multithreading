@@ -5,7 +5,7 @@
  * Window - Preferences - Java - Code Style - Code Templates
  */
 
-package com.antiaction.raptor.base;
+package com.antiaction.multithreading.datasource;
 
 import java.io.PrintWriter;
 import java.sql.Connection;
@@ -14,8 +14,11 @@ import java.util.Map;
 
 import javax.sql.DataSource;
 
-import com.antiaction.multithreading.datasource.DataSourcePoolImpl;
-
+/**
+ * Implements a weak-reference to the datasource using the finalize method to detect when the datasource can be shutdown.
+ * @author Nicholas
+ *
+ */
 public class DataSourceReference implements DataSource {
 
 	private DataSourcePoolImpl ds = null;
@@ -24,17 +27,18 @@ public class DataSourceReference implements DataSource {
 		this.ds = ds;
 	}
 
-	public static DataSource getDataSource(Map<String, String> attribs, Map<String, String> props) {
+	public static DataSource getDataSource(Map attribs, Map props) {
 		return new DataSourceReference( DataSourcePoolImpl.getDataSource( attribs, props ) );
 	}
 
 	/* (non-Javadoc)
 	 * @see java.lang.Object#finalize()
 	 */
-	@Override
+	//@Override
 	protected void finalize() throws Throwable {
 		// debug
 		System.out.println( this + ".finalize()" );
+		ds.stop();
 		super.finalize();
 	}
 

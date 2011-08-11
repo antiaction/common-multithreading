@@ -119,6 +119,12 @@ public class ResourceManager implements Runnable {
 		}
 	}
 
+	public void stop() {
+		if ( running ) {
+			exit = true;
+		}
+	}
+
 	public void run() {
 		running = true;
 
@@ -154,137 +160,147 @@ public class ResourceManager implements Runnable {
 		 * Monitor loop.
 		 */
 
-		while ( !exit ) {
+		while ( running ) {
 			// debug
 			//System.out.println( workerThreads + " - " + workingThreads + " - " + idleThreads );
 			//System.out.println( workerList.size() );
 
 			resourcePool.check_pool();
 
-			if ( ( allocated < max ) && ( idle < threshold ) ) {
-				/*
-				 * Allocate.
-				 */
-				n = threshold - idle;
-				if ( ( allocated + n > max ) ) {
-					n = max - allocated;
+			if ( !exit ) {
+				if ( ( allocated < max ) && ( idle < threshold ) ) {
+					/*
+					 * Allocate.
+					 */
+					n = threshold - idle;
+					if ( ( allocated + n > max ) ) {
+						n = max - allocated;
+					}
+					resourcePool.allocate( n );
 				}
-				resourcePool.allocate( n );
-			}
-			else {
-				/*
-				 * New min idle.
-				 */
-				if ( sampleSeconds < 0 ) {
-					sampleSeconds = idleSampleSecs;
-					synchronized( this ) {
-						localMinIdle = minIdle;
-						minIdle = idle;
-					}
-					// debug
-					//System.out.println( workers + " - " + localMinIdle);
-
+				else {
 					/*
-					 * Last modified.
+					 * New min idle.
 					 */
-
-					ctm = System.currentTimeMillis();
-					idleObjects[ localMinIdle ].lastModified = ctm;
-
-					/*
-					 * Remove old idleObjects.
-					 */
-					idleObj = rootIdleObj;
-
-					while ( idleObj != null ) {
-						if ( ( ctm - idleObj.lastModified ) > ( lastModifiedTimeout ) ) {
-							prevIdleObj = idleObj.prev;
-							nextIdleObj = idleObj.next;
-							if ( nextIdleObj != null ) {
-								nextIdleObj.prev = prevIdleObj;
-							}
-							if ( prevIdleObj != null ) {
-								prevIdleObj.next = nextIdleObj;
-							}
-							else {
-								rootIdleObj = nextIdleObj;
-							}
-							idleObj.prev = null;
-							idleObj.next = null;
-							idleObj = nextIdleObj;
+					if ( sampleSeconds < 0 ) {
+						sampleSeconds = idleSampleSecs;
+						synchronized( this ) {
+							localMinIdle = minIdle;
+							minIdle = idle;
 						}
-						else {
-							idleObj = idleObj.next;
-						}
-					}
-					/*
-					 * Insert new IdleObject.
-					 */
-					idleObj = idleObjects[ localMinIdle ];
-					if ( rootIdleObj == null ) {
-						rootIdleObj = idleObj;
-					}
-					else if ( ( idleObj.prev == null ) && ( idleObj.next == null ) && ( idleObj != rootIdleObj ) ) {
-						prevIdleObj = null;
-						nextIdleObj = rootIdleObj;
+						// debug
+						//System.out.println( workers + " - " + localMinIdle);
 
-						boolean b = true;
 						/*
-						 * Compare.
+						 * Last modified.
 						 */
-						while ( b ) {
-							if ( idleObj.index < nextIdleObj.index ) {
-								b = false;
-							}
-							else {
-								prevIdleObj = nextIdleObj;
-								nextIdleObj = nextIdleObj.next;
-								if ( nextIdleObj == null ) {
-									b = false;
+
+						ctm = System.currentTimeMillis();
+						idleObjects[ localMinIdle ].lastModified = ctm;
+
+						/*
+						 * Remove old idleObjects.
+						 */
+						idleObj = rootIdleObj;
+
+						while ( idleObj != null ) {
+							if ( ( ctm - idleObj.lastModified ) > ( lastModifiedTimeout ) ) {
+								prevIdleObj = idleObj.prev;
+								nextIdleObj = idleObj.next;
+								if ( nextIdleObj != null ) {
+									nextIdleObj.prev = prevIdleObj;
 								}
+								if ( prevIdleObj != null ) {
+									prevIdleObj.next = nextIdleObj;
+								}
+								else {
+									rootIdleObj = nextIdleObj;
+								}
+								idleObj.prev = null;
+								idleObj.next = null;
+								idleObj = nextIdleObj;
+							}
+							else {
+								idleObj = idleObj.next;
 							}
 						}
 						/*
-						 * Insert.
+						 * Insert new IdleObject.
 						 */
-						if ( prevIdleObj == null ) {
+						idleObj = idleObjects[ localMinIdle ];
+						if ( rootIdleObj == null ) {
 							rootIdleObj = idleObj;
 						}
-						else {
-							prevIdleObj.next = idleObj;
-							idleObj.prev = prevIdleObj;
-						}
-						if ( nextIdleObj != null ) {
-							idleObj.next = nextIdleObj;
-							nextIdleObj.prev = idleObj;
-						}
-					}
-					/*
-					 * Print.
-					 */
-					/*
-					idleObj = rootIdleObj;
-					while ( idleObj != null ) {
-						// debug
-						System.out.println( idleObj.index);
-						idleObj = idleObj.next;
-					}
-					*/
-					/*
-					 * Release.
-					 */
-					int postWorkers;
-					if ( ( rootIdleObj != null ) && ( rootIdleObj.index > threshold ) && ( allocated > min ) ) {
-						postWorkers = allocated - ( rootIdleObj.index - threshold );
-						if ( postWorkers < min ) {
-							postWorkers = min;
-						}
-						n = allocated - postWorkers;
-						resourcePool.release( n );
+						else if ( ( idleObj.prev == null ) && ( idleObj.next == null ) && ( idleObj != rootIdleObj ) ) {
+							prevIdleObj = null;
+							nextIdleObj = rootIdleObj;
 
-						// debug
-						//System.out.println( "Stopping: " + stop );
+							boolean b = true;
+							/*
+							 * Compare.
+							 */
+							while ( b ) {
+								if ( idleObj.index < nextIdleObj.index ) {
+									b = false;
+								}
+								else {
+									prevIdleObj = nextIdleObj;
+									nextIdleObj = nextIdleObj.next;
+									if ( nextIdleObj == null ) {
+										b = false;
+									}
+								}
+							}
+							/*
+							 * Insert.
+							 */
+							if ( prevIdleObj == null ) {
+								rootIdleObj = idleObj;
+							}
+							else {
+								prevIdleObj.next = idleObj;
+								idleObj.prev = prevIdleObj;
+							}
+							if ( nextIdleObj != null ) {
+								idleObj.next = nextIdleObj;
+								nextIdleObj.prev = idleObj;
+							}
+						}
+						/*
+						 * Print.
+						 */
+						/*
+						idleObj = rootIdleObj;
+						while ( idleObj != null ) {
+							// debug
+							System.out.println( idleObj.index);
+							idleObj = idleObj.next;
+						}
+						*/
+						/*
+						 * Release.
+						 */
+						int postWorkers;
+						if ( ( rootIdleObj != null ) && ( rootIdleObj.index > threshold ) && ( allocated > min ) ) {
+							postWorkers = allocated - ( rootIdleObj.index - threshold );
+							if ( postWorkers < min ) {
+								postWorkers = min;
+							}
+							n = allocated - postWorkers;
+							resourcePool.release( n );
+
+							// debug
+							//System.out.println( "Stopping: " + stop );
+						}
 					}
+				}
+			}
+			else {
+				if ( idle > 0 ) {
+					resourcePool.release( idle );
+				}
+				if ( allocated == 0 ) {
+					running = false;
 				}
 			}
 
@@ -295,8 +311,6 @@ public class ResourceManager implements Runnable {
 			catch (InterruptedException e) {
 			}
 		}
-
-		running = false;
 	}
 
 	/*

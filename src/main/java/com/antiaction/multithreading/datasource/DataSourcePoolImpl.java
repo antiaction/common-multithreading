@@ -123,7 +123,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		busySet = new HashSet( 16 );
 	}
 
-	public static DataSource getDataSource(Map config, Map props) {
+	public static DataSourcePoolImpl getDataSource(Map config, Map props) {
 		DataSourcePoolImpl dataSource = null;
 
 		String driverClassName = (String)config.get( "driver-class" );
@@ -200,6 +200,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			resourceManagerThread = new Thread( resourceManager );
 			resourceManagerThread.start();
 
+			exit = false;
 			running = true;
 
 			System.out.println( "Connection pool initialized." );
@@ -207,6 +208,17 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		}
 
 		return running;
+	}
+
+	public void stop() {
+		if ( running ) {
+			exit = true;
+			running = false;
+			resourceManager.stop();
+			//resourceManager = null;
+			resourceManagerThread = null;
+			log_writer = null;
+		}
 	}
 
 	public void setLoginTimeout(int seconds) throws SQLException {
@@ -226,43 +238,45 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 	}
 
 	public Connection getConnection(String username, String password) throws SQLException {
-		Connection conn;
-		Properties connprops = new Properties();
-		if ( username != null && username.length() > 0 ) {
-			connprops.setProperty( "user", username );
+		Connection conn = null;
+		if ( running ) {
+			Properties connprops = new Properties();
+			if ( username != null && username.length() > 0 ) {
+				connprops.setProperty( "user", username );
+			}
+			if ( password != null && password.length() > 0 ) {
+				connprops.setProperty( "password", password );
+			}
+			conn = DriverManager.getConnection( ds_url, connprops );
 		}
-		if ( password != null && password.length() > 0 ) {
-			connprops.setProperty( "password", password );
-		}
-
-		conn = DriverManager.getConnection( ds_url, connprops );
-
 		return conn;
 	}
 
 	public Connection getConnection() throws SQLException {
 		Connection conn = null;
-		synchronized ( this ) {
-			if ( idle > 0 ) {
-				conn = (Connection)idleList.remove( idleList.size() - 1 );
-				conn = ConnectionPooled.getInstance( this, conn );
-				if ( check_connection_open( conn ) ) {
-					--idle;
+		if ( running ) {
+			synchronized ( this ) {
+				if ( idle > 0 ) {
+					conn = (Connection)idleList.remove( idleList.size() - 1 );
+					conn = ConnectionPooled.getInstance( this, conn );
+					if ( check_connection_open( conn ) ) {
+						--idle;
+						busySet.add( conn );
+						resourceManager.update( allocated, idle );
+					}
+					else {
+						conn = null;
+					}
+				}
+			}
+			if ( conn == null ) {
+				conn = openConnection();
+				synchronized ( this ) {
+					++allocated;
+					conn = ConnectionPooled.getInstance( this, conn );
 					busySet.add( conn );
 					resourceManager.update( allocated, idle );
 				}
-				else {
-					conn = null;
-				}
-			}
-		}
-		if ( conn == null ) {
-			conn = openConnection();
-			synchronized ( this ) {
-				++allocated;
-				conn = ConnectionPooled.getInstance( this, conn );
-				busySet.add( conn );
-				resourceManager.update( allocated, idle );
 			}
 		}
 		return conn;
