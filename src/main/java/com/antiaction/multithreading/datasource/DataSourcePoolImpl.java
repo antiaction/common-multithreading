@@ -14,6 +14,7 @@
  * 06-Sep-2010 : Added check pool for closed connections and various other enhancements.
  * 20-Jun-2011 : Added a query to check if the connection is alive.
  * 27-Jun-2011 : Refactored init and commented the variables.
+ * 10-Sep-2011 : Forgot to stm.close(). Hope this fixes my sudden memory leak.
  *
  */
 
@@ -342,16 +343,36 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 
 	protected boolean check_connection_open(Connection conn) {
 		boolean bClosed = true;
+		Statement stm = null;
+		ResultSet rs = null;
 		try {
 			bClosed = conn.isClosed();
 			if ( !bClosed ) {
-				Statement stm = conn.createStatement();
-				ResultSet rs = stm.executeQuery( "SELECT 1" );
-				rs.close();
+				stm = conn.createStatement();
+				rs = stm.executeQuery( "SELECT 1" );
 			}
-		} catch (SQLException e) {
+		}
+		catch (SQLException e) {
 			// Suppress no route to host.
 			bClosed = true;
+		}
+		finally {
+			try {
+				if ( rs != null ) {
+					rs.close();
+					rs = null;
+				}
+			}
+			catch (SQLException e) {
+			}
+			try {
+				if ( stm != null ) {
+					stm.close();
+					stm = null;
+				}
+			}
+			catch (SQLException e) {
+			}
 		}
 		if ( bClosed ) {
 			synchronized ( this ) {
