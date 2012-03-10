@@ -47,7 +47,9 @@ import com.antiaction.multithreading.resourcemanage.IResourcePool;
 import com.antiaction.multithreading.resourcemanage.ResourceManager;
 
 /**
- * Advanced ThreadPool.
+ * Advanced ThreadPool which is used together with a <code>ResourceManager</code>.
+ * This class manages a pool of threads by starting/stopping and monitoring them.
+ * The number of active threads at any given time is managed by the <code>ResourceManager</code>.
  *
  * @version 1.00
  * @author Nicholas Clarke <mayhem[at]antiaction[dot]com>
@@ -113,7 +115,7 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 
 	protected List threadList;
 
-	protected List idleList;
+	protected Set idleSet;
 
 	protected Set busySet;
 
@@ -122,7 +124,7 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 		threadGroup = new ThreadGroup( "ThreadPool" );
 		threadPool = this;
 		threadList = new ArrayList();
-		idleList = new ArrayList();
+		idleSet = new HashSet();
 		busySet = new HashSet();
 	}
 
@@ -148,6 +150,9 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	}
 
 	public boolean start() {
+		if ( threadWorker == null ) {
+			throw new IllegalStateException( "Missing worker!" );
+		}
 		if ( !running ) {
 			resourceManager.setMin( min );
 			resourceManager.setThreshold( minIdle );
@@ -174,24 +179,32 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	/* Javadoc Inherited. */
 	public void register() {
 		synchronized ( this ) {
-			++registered_threads;
-			++busy_threads;
+			if ( busySet.add( Thread.currentThread() ) ) {
+				++registered_threads;
+				++busy_threads;
+			}
 		}
 	}
 
 	/* Javadoc Inherited. */
 	public void unregister() {
 		synchronized ( this ) {
-			--registered_threads;
-			--busy_threads;
+			if ( busySet.remove( Thread.currentThread() ) ) {
+				--registered_threads;
+				--busy_threads;
+			}
 		}
 	}
 
 	/* Javadoc Inherited. */
 	public void checkIn() {
 		synchronized ( this ) {
-			--busy_threads;
-			++idle_threads;
+			if ( busySet.remove( Thread.currentThread() ) ) {
+				--busy_threads;
+			}
+			if ( idleSet.add( Thread.currentThread() ) ) {
+				++idle_threads;
+			}
 			resourceManager.update( allocated_threads, idle_threads );
 		}
 	}
@@ -199,8 +212,12 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 	/* Javadoc Inherited. */
 	public void checkOut() {
 		synchronized ( this ) {
-			++busy_threads;
-			--idle_threads;
+			if ( busySet.add( Thread.currentThread() ) ) {
+				++busy_threads;
+			}
+			if ( idleSet.remove( Thread.currentThread() ) ) {
+				--idle_threads;
+			}
 			resourceManager.update( allocated_threads, idle_threads );
 		}
 	}
@@ -218,6 +235,10 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 		}
 	}
 
+	/**
+	 * Start a given number of threads.
+	 * @param n number of threads to start
+	 */
 	public void allocate(int n) {
 		IThreadWorker w;
 		Thread t;
@@ -229,6 +250,7 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 			t.start();
 
 			synchronized ( this ) {
+				threadList.add( t );
 				++allocated_threads;
 				resourceManager.update( allocated_threads, idle_threads );
 			}
@@ -240,6 +262,10 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 		}
 	}
 
+	/**
+	 * Set the number of threads that should be stopped when convenient.
+	 * @param n number of threads that should be stopped when convenient
+	 */
 	public void release(int n) {
 		synchronized ( this ) {
 			overflowing_threads += n;
@@ -248,28 +274,31 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 		}
 	}
 
+	/** Work list for alive check. */
+	protected List checkList = new ArrayList();
+
+	/**
+	 * Perform Thread liveness check.
+	 */
 	public void check_pool() {
-		List checkList;
 		Thread t;
 		synchronized ( this ) {
-			checkList = new ArrayList( threadList );
+			checkList.addAll( threadList );
 		}
 		int i = 0;
 		while ( i<checkList.size() ) {
 			t = (Thread)checkList.get( i );
 			if ( !t.isAlive() ) {
 				synchronized ( this ) {
-					if ( busySet.contains( t ) ) {
+					if ( busySet.remove( t ) ) {
 						--allocated_threads;
 						--registered_threads;
 						--busy_threads;
-						busySet.remove( t );
 					}
-					else if ( idleList.contains( t ) ) {
+					else if ( idleSet.remove( t ) ) {
 						--allocated_threads;
 						--registered_threads;
 						--idle_threads;
-						idleList.remove( t );
 					}
 					threadList.remove( t );
 				}
@@ -279,6 +308,7 @@ public class ThreadPool implements IThreadPool, IResourcePool {
 			}
 			++i;
 		}
+		checkList.clear();
 		resourceManager.update( allocated_threads, idle_threads );
 	}
 

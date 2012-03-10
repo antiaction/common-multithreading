@@ -43,6 +43,10 @@ package com.antiaction.multithreading.resourcemanage;
  */
 public class ResourceManager implements Runnable {
 
+	/*
+	 * Internal state.
+	 */
+
 	/** Call-back for resource allocation and release. */
 	protected IResourcePool resourcePool;
 
@@ -52,28 +56,37 @@ public class ResourceManager implements Runnable {
 	/** Has thread been started. */
 	protected boolean running = false;
 
+	/** Array of idle objects in a linked list sorted by index=idlecountindex. */
+	protected IdleObject[] idleObjects;
+
+	/** First idle object in linked list. */
+	protected IdleObject rootIdleObj = null;
+
+	/*
+	 * Settings.
+	 */
+
 	/** Minimum resources. */
 	protected int min = 1;
+
 	/** Idle threshold - minimum idle resources before more are spawned but below max. */
 	protected int threshold = 1;
+
 	/** Maximum resources. */
 	protected int max = 1;
 
 	/** Initial sample second interval. */
 	protected int idleSampleSecsInit = 60 * 1;
+
 	/** Sample second interval. */
 	protected int idleSampleSecs = 60;
 
-	/** Minimum idle number compared/set each time a worker goes busy. */
-	protected int minIdle = 0;
-
 	/** Last modified idle threshold count timeout after which resources can be freed and still be within the idle threshold. */
-	protected int lastModifiedTimeout = 1000 * 60 * 30;
+	protected int lastTimeIdleTimeoutMillis = 1000 * 60 * 30;
 
-	/** Array of idle objects in a linked list sorted by index=idlecountindex. */
-	protected IdleObject[] idleObjects;
-	/** First idle object in linked list. */
-	protected IdleObject rootIdleObj = null;
+	/*
+	 * Resource pool state.
+	 */
 
 	/** Total amount of resources allocated. */
 	protected int allocated = 0;
@@ -81,6 +94,13 @@ public class ResourceManager implements Runnable {
 	/** Idle resources. */
 	protected int idle = 0;
 
+	/** Minimum idle number compared/set each time a worker goes busy. */
+	protected int minIdle = 0;
+
+	/**
+	 * Construct a resource manager for the designated resource pool.
+	 * @param resourcePool resource pool to manage.
+	 */
 	public ResourceManager(IResourcePool resourcePool) {
 		this.resourcePool = resourcePool;
 	}
@@ -107,6 +127,30 @@ public class ResourceManager implements Runnable {
 
 	public void setMax(int max) {
 		this.max = max;
+	}
+
+	public int getIdleSampleSecsInit() {
+		return idleSampleSecsInit;
+	}
+
+	public void setIdleSampleSecsInit(int idleSampleSecsInit) {
+		this.idleSampleSecsInit = idleSampleSecsInit;
+	}
+
+	public int getIdleSampleSecs() {
+		return idleSampleSecs;
+	}
+
+	public void setIdleSampleSecs(int idleSampleSecs) {
+		this.idleSampleSecs = idleSampleSecs;
+	}
+
+	public int getLastTimeIdleTimeoutMillis() {
+		return lastTimeIdleTimeoutMillis;
+	}
+
+	public void setLastTimeIdleTimeoutMillis(int lastModifiedTimeout) {
+		this.lastTimeIdleTimeoutMillis = lastModifiedTimeout;
 	}
 
 	public void update(int allocated, int idle) {
@@ -196,7 +240,7 @@ public class ResourceManager implements Runnable {
 						 */
 
 						ctm = System.currentTimeMillis();
-						idleObjects[ localMinIdle ].lastModified = ctm;
+						idleObjects[ localMinIdle ].lastTimeIdleMillis = ctm;
 
 						/*
 						 * Remove old idleObjects.
@@ -204,7 +248,7 @@ public class ResourceManager implements Runnable {
 						idleObj = rootIdleObj;
 
 						while ( idleObj != null ) {
-							if ( ( ctm - idleObj.lastModified ) > ( lastModifiedTimeout ) ) {
+							if ( ( ctm - idleObj.lastTimeIdleMillis ) > ( lastTimeIdleTimeoutMillis ) ) {
 								prevIdleObj = idleObj.prev;
 								nextIdleObj = idleObj.next;
 								if ( nextIdleObj != null ) {
@@ -335,16 +379,16 @@ public class ResourceManager implements Runnable {
 	}
 	*/
 
-	class IdleObject {
+	static class IdleObject {
 
 		int index;
-		long lastModified;
+		long lastTimeIdleMillis;
 
 		IdleObject prev = null;
 		IdleObject next = null;
 
-		IdleObject(int _index) {
-			index = _index;
+		IdleObject(int index) {
+			this.index = index;
 		}
 
 	}

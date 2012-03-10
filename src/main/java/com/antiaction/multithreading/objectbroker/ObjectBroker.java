@@ -41,8 +41,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.antiaction.common.concurrent.Multex;
-import com.antiaction.common.concurrent.Mutex;
+import com.antiaction.multithreading.concurrent.Multex;
+import com.antiaction.multithreading.concurrent.Mutex;
 
 /**
  * ObjectBroker.
