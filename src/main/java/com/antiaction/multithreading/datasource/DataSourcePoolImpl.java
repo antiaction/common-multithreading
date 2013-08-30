@@ -29,7 +29,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -418,21 +417,10 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			busySet.remove( conn );
 			Connection orgConn = conn.getOriginalConnection();
 			// Close any open statements.
-			if ( conn.open_statements.size() > 0 ) {
+			int openStatements = conn.closeOpenStatements();
+			if (openStatements > 0 ) {
 				// debug
-				System.out.println( "Statement(s) not closed: "  + conn.open_statements.size() );
-				Iterator iter = conn.open_statements.iterator();
-				Statement stm;
-				while ( iter.hasNext() ) {
-					stm = (Statement)iter.next();
-					try {
-						stm.close();
-					}
-					catch (SQLException e) {
-						System.out.println( "SQLException closing Statement." );
-					}
-					iter.remove();
-				}
+				System.out.println( "Statement(s) not closed: "  + openStatements );
 			}
 			// Check for open connection.
 			boolean bIsClosed = true;

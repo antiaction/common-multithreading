@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Savepoint;
 import java.sql.Statement;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -49,6 +50,31 @@ public class ConnectionPooled implements Connection {
 		return connection;
 	}
 
+	public int closeOpenStatements() {
+		int closed = 0;
+		synchronized (open_statements) {
+			if ( open_statements.size() > 0 ) {
+				Object[] stmts = new Statement[ open_statements.size() ];
+				stmts = open_statements.toArray( stmts );
+				Statement stmt;
+				for ( int i=0; i<stmts.length; ++i ) {
+					stmt = (Statement)stmts[ i ];
+					if ( stmt != null ) {
+						try {
+							stmt.close();
+							++closed;
+						}
+						catch (SQLException e) {
+							// debug
+							System.out.println( "SQLException closing Statement." );
+						}
+					}
+				}
+			}
+		}
+		return closed;
+	}
+
 	public void closeStatement(Statement stm) {
 		synchronized ( open_statements ) {
 			open_statements.remove( stm );
@@ -67,8 +93,10 @@ public class ConnectionPooled implements Connection {
 			dspi.closeConnection( this );
 			connection = null;
 			last_called = System.currentTimeMillis();
-			open_statements.clear();
-			open_statements = null;
+			synchronized ( open_statements ) {
+				open_statements.clear();
+				open_statements = null;
+			}
 		}
 	}
 
