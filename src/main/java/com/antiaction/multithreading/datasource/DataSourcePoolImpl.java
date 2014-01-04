@@ -110,11 +110,13 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 	protected int max;
 
 	/** Connection alive Sql. */
-	protected String validation_query;
+	protected String validation_query = "SELECT 1";
 
 	/*
 	 * Internal state.
 	 */
+
+	protected SQLException lastOpenException;
 
 	protected int allocated = 0;
 
@@ -276,11 +278,13 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			}
 			if ( conn == null ) {
 				conn = openConnection();
-				synchronized ( this ) {
-					++allocated;
-					conn = ConnectionPooled.getInstance( this, conn );
-					busySet.add( conn );
-					resourceManager.update( allocated, idle );
+				if ( conn != null ) {
+					synchronized ( this ) {
+						++allocated;
+						conn = ConnectionPooled.getInstance( this, conn );
+						busySet.add( conn );
+						resourceManager.update( allocated, idle );
+					}
 				}
 			}
 		}
@@ -351,9 +355,9 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		ResultSet rs = null;
 		try {
 			bClosed = conn.isClosed();
-			if ( !bClosed ) {
+			if ( !bClosed && validation_query != null && validation_query.length() > 0 ) {
 				stm = conn.createStatement();
-				rs = stm.executeQuery( "SELECT 1" );
+				rs = stm.executeQuery( validation_query );
 			}
 		}
 		catch (SQLException e) {
@@ -361,21 +365,21 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			bClosed = true;
 		}
 		finally {
-			try {
-				if ( rs != null ) {
+			if ( rs != null ) {
+				try {
 					rs.close();
-					rs = null;
 				}
+				catch (SQLException e) {
+				}
+				rs = null;
 			}
-			catch (SQLException e) {
-			}
-			try {
-				if ( stm != null ) {
+			if ( stm != null ) {
+				try {
 					stm.close();
-					stm = null;
 				}
-			}
-			catch (SQLException e) {
+				catch (SQLException e) {
+				}
+				stm = null;
 			}
 		}
 		if ( bClosed ) {
@@ -386,9 +390,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 					idleList.remove( conn );
 				}
 			}
-
-			// debug
-			System.out.println( "Closed connection: " + conn );
+			logger.log( Level.INFO, "Pooled connection closed unexpectedly: " + conn );
 		}
 		return !bClosed;
 	}
@@ -402,16 +404,19 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		if ( ds_password != null && ds_password.length() > 0 ) {
 			connprops.setProperty( "password", ds_password );
 		}
-
 		try {
 			long dt = System.currentTimeMillis();
 			conn = DriverManager.getConnection( ds_url, connprops );
+			lastOpenException = null;
 			dt = System.currentTimeMillis() - dt;
-			// debug
-			System.out.println( "Database connect time: " + dt + " ms." );
+			logger.log( Level.INFO, "Database connect time: " + dt + " ms." );
 		}
 		catch (SQLException e) {
 			// Suppress no route to host.
+			if ( lastOpenException == null ) {
+				lastOpenException = e;
+				logger.log( Level.SEVERE, e.toString(), e );
+			}
 		}
 		return conn;
 	}
@@ -423,8 +428,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			// Close any open statements.
 			int openStatements = conn.closeOpenStatements();
 			if (openStatements > 0 ) {
-				// debug
-				System.out.println( "Statement(s) not closed: "  + openStatements );
+				logger.log( Level.WARNING, "Statement(s) not closed: "  + openStatements );
 			}
 			// Check for open connection.
 			boolean bIsClosed = true;
