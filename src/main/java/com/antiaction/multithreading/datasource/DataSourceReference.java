@@ -66,4 +66,16 @@ public class DataSourceReference implements DataSource {
 		return ds.getLoginTimeout();
 	}
 
+	/*
+	 * JDK6
+	 */
+
+	public <T> T unwrap(Class<T> iface) throws SQLException {
+		return ds.unwrap( iface );
+	}
+
+	public boolean isWrapperFor(Class<?> iface) throws SQLException {
+		return isWrapperFor( iface );
+	}
+
 }

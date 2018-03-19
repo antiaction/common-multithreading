@@ -22,12 +22,15 @@ import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Date;
+import java.sql.NClob;
 import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
 import java.sql.Ref;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
@@ -356,6 +359,154 @@ public class PreparedStatementWrapper extends StatementWrapper implements Prepar
 			throw new SQLException( "Database statement closed!" );
 		}
 		return stm.executeUpdate();
+	}
+
+	/*
+	 * JDK6.
+	 */
+
+	public void setRowId(int parameterIndex, RowId x) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setRowId( parameterIndex, x );
+	}
+
+	public void setNString(int parameterIndex, String value) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setNString( parameterIndex, value );
+	}
+
+	public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setBlob( parameterIndex, inputStream );
+	}
+
+	public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setBlob( parameterIndex, inputStream, length );
+	}
+
+	public void setClob(int parameterIndex, Reader reader) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setClob( parameterIndex, reader );
+	}
+
+	public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setClob( parameterIndex, reader, length );
+	}
+
+	public void setNClob(int parameterIndex, NClob value) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setNClob( parameterIndex, value );
+	}
+
+	public void setNClob(int parameterIndex, Reader reader) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setNClob( parameterIndex, reader );
+	}
+
+	public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setNClob( parameterIndex, reader, length );
+	}
+
+	public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setSQLXML( parameterIndex, xmlObject);
+	}
+
+	public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setAsciiStream( parameterIndex, x );
+	}
+
+	public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setAsciiStream( parameterIndex, x, length );
+	}
+
+	public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setBinaryStream( parameterIndex, x );
+	}
+
+	public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setBinaryStream( parameterIndex, x, length );
+	}
+
+	public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setCharacterStream( parameterIndex, reader );
+	}
+
+	public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setCharacterStream( parameterIndex, reader, length );
+	}
+
+	public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setNCharacterStream( parameterIndex, value );
+	}
+
+	public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setNCharacterStream( parameterIndex, value, length );
 	}
 
 }

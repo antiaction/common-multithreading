@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
 		<groupId>com.antiaction</groupId>
@@ -9,7 +9,6 @@
 		<version>1-SNAPSHOT</version>
 	</parent>
 
-	<groupId>com.antiaction</groupId>
 	<artifactId>common-multithreading</artifactId>
 	<version>0.1.0-SNAPSHOT</version>
 
@@ -20,6 +19,10 @@
 	<url>http://www.antiaction.com/</url>
 
 	<inceptionYear>2000</inceptionYear>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
 
 	<developers>
 		<developer>
@@ -32,23 +35,31 @@
 			<organizationUrl>http://www.antiaction.com</organizationUrl>
 		</developer>
 	</developers>
-<!--
-	<distributionManagement>
-		<snapshotRepository>
+
+	<repositories>
+		<repository>
 			<id>antiaction-snapshots</id>
 			<name>Antiaction Snapshots Repository</name>
-			<url>${antiactionSnapshotsUrl}</url>
-		</snapshotRepository>
-		<repository>
-			<id>antiaction-staging</id>
-			<name>Antiaction Release Repository</name>
-			<url>${antiactionStagingUrl}</url>
+			<url>https://www.antiaction.com:8443/repository/snapshots/</url>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
 		</repository>
-	</distributionManagement>
--->
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	</properties>
+		<repository>
+			<id>antiaction-releases</id>
+			<name>Antiaction Releases Repository</name>
+			<url>https://www.antiaction.com:8443/repository/releases/</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+		</repository>
+	</repositories>
 
 	<dependencies>
 		<dependency>
@@ -71,10 +82,32 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
-					<source>1.5</source>
-					<target>1.5</target>
+					<source>1.6</source>
+					<target>1.6</target>
 				</configuration>
 			</plugin>
+<!--
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-toolchains-plugin</artifactId>
+				<version>1.1</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>toolchain</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<toolchains>
+						<jdk>
+							<version>1.5</version>
+							<vendor>sun</vendor>
+						</jdk>
+					</toolchains>
+				</configuration>
+			</plugin>
+-->
 		</plugins>
 	</build>
 </project>

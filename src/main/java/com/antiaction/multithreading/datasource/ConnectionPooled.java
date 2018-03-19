@@ -14,15 +14,23 @@
 
 package com.antiaction.multithreading.datasource;
 
+import java.sql.Array;
+import java.sql.Blob;
 import java.sql.CallableStatement;
+import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.NClob;
 import java.sql.PreparedStatement;
+import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
+import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
+import java.sql.Struct;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Level;
@@ -490,6 +498,114 @@ public class ConnectionPooled implements Connection {
 		String nativeSql = connection.nativeSQL( sql );
 		last_called = System.currentTimeMillis();
 		return nativeSql;
+	}
+
+	/*
+	 * JDK6.
+	 */
+
+	public boolean isWrapperFor(Class<?> iface) throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.isWrapperFor( iface );
+	}
+
+	public <T> T unwrap(Class<T> iface) throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.unwrap( iface );
+	}
+
+	public boolean isValid(int timeout) throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.isValid( timeout );
+	}
+
+	public Properties getClientInfo() throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.getClientInfo();
+	}
+
+	public void setClientInfo(Properties properties) throws SQLClientInfoException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLClientInfoException();
+		}
+		connection.setClientInfo( properties );
+	}
+
+	public String getClientInfo(String name) throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.getClientInfo( name );
+	}
+
+	public void setClientInfo(String name, String value) throws SQLClientInfoException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLClientInfoException();
+		}
+		connection.setClientInfo( name, value );
+	}
+
+	public SQLXML createSQLXML() throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.createSQLXML();
+	}
+
+	public Blob createBlob() throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.createBlob();
+	}
+
+	public Clob createClob() throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.createClob();
+	}
+
+	public NClob createNClob() throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.createNClob();
+	}
+
+	public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.createArrayOf( typeName, elements );
+	}
+
+	public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
+		if ( connection == null ) {
+			logger.log( Level.SEVERE, "Database connection closed!" );
+			throw new SQLException( "Database connection closed!" );
+		}
+		return connection.createStruct( typeName, attributes );
 	}
 
 }

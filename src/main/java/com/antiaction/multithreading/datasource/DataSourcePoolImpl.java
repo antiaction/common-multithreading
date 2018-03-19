@@ -110,7 +110,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 	protected int max;
 
 	/** Connection alive Sql. */
-	protected String validation_query = "SELECT 1";
+	protected String ds_validation_query;
 
 	/*
 	 * Internal state.
@@ -155,7 +155,7 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 			}
 		}
 		else {
-			logger.log( Level.SEVERE, "Error: invalid jdbc class." );
+			logger.log( Level.WARNING, "JDBC class not supplied." );
 		}
 
 		if ( driverObject != null ) {
@@ -164,18 +164,23 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 				String displayName = (String)config.get( "display-name" );
 				String userName = (String)config.get( "user-name" );
 				String password = (String)config.get( "password" );
-
+				String validation_query = (String)config.get( "validation-query" );
+				if ( validation_query == null ) {
+					validation_query = "SELECT 1";
+				}
+				else if ( validation_query.length() == 0 ) {
+					validation_query = null;
+				}
 				dataSource = new DataSourcePoolImpl();
 				dataSource.props = (Map)((HashMap)config).clone();
 				dataSource.ds_name = displayName;
 				dataSource.ds_url = connectionUrl;
 				dataSource.ds_username = userName;
 				dataSource.ds_password = password;
-
 				dataSource.min = getMapInt( config, "min", 4 );
 				dataSource.minIdle = getMapInt( config, "min-idle", 4 );
 				dataSource.max = getMapInt( config, "max", 16 );
-
+				dataSource.ds_validation_query = validation_query;
 				dataSource.start();
 			}
 			else {
@@ -355,9 +360,9 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 		ResultSet rs = null;
 		try {
 			bClosed = conn.isClosed();
-			if ( !bClosed && validation_query != null && validation_query.length() > 0 ) {
+			if ( !bClosed && ds_validation_query != null && ds_validation_query.length() > 0 ) {
 				stm = conn.createStatement();
-				rs = stm.executeQuery( validation_query );
+				rs = stm.executeQuery( ds_validation_query );
 			}
 		}
 		catch (SQLException e) {
@@ -447,6 +452,18 @@ public class DataSourcePoolImpl implements DataSource, IResourcePool {
 				--allocated;
 			}
 		}
+	}
+
+	/*
+	 * JDK6
+	 */
+
+	public <T> T unwrap(Class<T> iface) throws SQLException {
+		return null;
+	}
+
+	public boolean isWrapperFor(Class<?> iface) throws SQLException {
+		return false;
 	}
 
 }

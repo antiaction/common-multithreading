@@ -348,4 +348,50 @@ public class StatementWrapper implements Statement, Comparable {
 		return stm.getResultSetHoldability();
 	}
 
+	/*
+	 * JDK6
+	 */
+
+	public boolean isPoolable() throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		return stm.isPoolable();
+	}
+
+	public void setPoolable(boolean poolable) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		stm.setPoolable( poolable );
+	}
+
+	public boolean isWrapperFor(Class<?> iface) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		return stm.isWrapperFor( iface );
+	}
+
+	public <T> T unwrap(Class<T> iface) throws SQLException {
+		if ( stm == null ) {
+			logger.log( Level.SEVERE, "Database statement closed!" );
+			throw new SQLException( "Database statement closed!" );
+		}
+		return stm.unwrap( iface );
+	}
+
+	// FIXME
+	public boolean isClosed() throws SQLException {
+		if ( stm != null ) {
+			return stm.isClosed();
+		}
+		else {
+			return false;
+		}
+	}
+
 }
